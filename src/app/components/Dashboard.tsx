@@ -1,30 +1,95 @@
-import { useState } from 'react'
-import { motion } from 'framer-motion'
-import { BarChart2, Send, Bot, User } from 'lucide-react'
-import axios from 'axios'
+import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { BarChart2, Send, Bot, User } from 'lucide-react';
+import axios from 'axios';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+
+interface Message {
+  text: string;
+  sender: 'user' | 'bot';
+}
+
+interface StockData {
+  date: string;
+  close: number;
+}
+
+interface NewsItem {
+  title: string;
+  url: string;
+  sentiment: number;
+}
 
 export default function DashboardTab() {
-  const [input, setInput] = useState('')
-  const [messages, setMessages] = useState<{text: string, sender: 'user' | 'bot'}[]>([])
+  const [input, setInput] = useState<string>('');
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [stockData, setStockData] = useState<StockData[] | null>(null);
+  const [newsData, setNewsData] = useState<NewsItem[]>([]);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!input.trim()) return
+    e.preventDefault();
+    if (!input.trim()) return;
 
-    const userMessage = { text: input, sender: 'user' as const }
-    setMessages(prev => [...prev, userMessage])
-    setInput('')
+    const userMessage: Message = { text: input, sender: 'user' };
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
 
     try {
-      const response = await axios.post('http://localhost:5000/api/chat', { message: input })
-      const botMessage = { text: response.data.response, sender: 'bot' as const }
-      setMessages(prev => [...prev, botMessage])
+      const response = await axios.post('http://localhost:5000/api/chat', { message: input });
+      const botMessage: Message = { text: response.data.response, sender: 'bot' };
+      setMessages(prev => [...prev, botMessage]);
+
+      // Process the response for stock data or news
+      if (response.data.stockData) {
+        setStockData(response.data.stockData);
+      }
+      if (response.data.newsData) {
+        setNewsData(response.data.newsData);
+      }
     } catch (error) {
-      console.error('Error:', error)
-      const errorMessage = { text: 'Sorry, there was an error processing your request.', sender: 'bot' as const }
-      setMessages(prev => [...prev, errorMessage])
+      console.error('Error:', error);
+      const errorMessage: Message = { text: 'Sorry, there was an error processing your request.', sender: 'bot' };
+      setMessages(prev => [...prev, errorMessage]);
     }
-  }
+  };
+
+  const renderStockChart = () => {
+    if (!stockData) return null;
+
+    return (
+      <div className="mt-4">
+        <h3 className="text-lg font-semibold mb-2">Stock Performance</h3>
+        <LineChart width={600} height={300} data={stockData}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="date" />
+          <YAxis />
+          <Tooltip />
+          <Legend />
+          <Line type="monotone" dataKey="close" stroke="#8884d8" />
+        </LineChart>
+      </div>
+    );
+  };
+
+  const renderNewsFeed = () => {
+    if (newsData.length === 0) return null;
+
+    return (
+      <div className="mt-4">
+        <h3 className="text-lg font-semibold mb-2">Latest News</h3>
+        <ul className="space-y-2">
+          {newsData.map((article, index) => (
+            <li key={index} className="border-b pb-2">
+              <a href={article.url} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600">
+                <h4 className="font-medium">{article.title}</h4>
+                <p className="text-sm text-gray-600">Sentiment: {article.sentiment.toFixed(2)}</p>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -48,6 +113,8 @@ export default function DashboardTab() {
             </motion.div>
           ))}
         </div>
+        {renderStockChart()}
+        {renderNewsFeed()}
       </div>
 
       <div className="bg-white rounded-lg shadow-md p-6">
@@ -89,5 +156,5 @@ export default function DashboardTab() {
         </form>
       </div>
     </div>
-  )
+  );
 }
